@@ -66,16 +66,33 @@ class MailboxBot(BotPlugin):
 
     @botcmd(split_args_with=' ')
     def mailboxes(self, mess, args):
-        cmd = args[0]
-        logging.debug(cmd)
-        if cmd is 'add':
-            pass
-        elif cmd is 'del':
-            pass
-        elif cmd is 'list':
-            return config.MAILBOXES
+        configuration = self.config
+        mailboxes = configuration['MAILBOXES']
+
+        cmd, args = args[0], args[1:]
+        if cmd == 'add':
+            if len(args) == 2:
+                name, relay = args
+                mailboxes[name] = {'relay': relay}
+                reply = 'added'
+            else:
+                reply = 'mailboxes add name relay'
+        elif cmd == 'del':
+            if len(args) == 1:
+                name = args[0]
+                mailboxes[name] = {}
+                reply = 'deleted'
+            else:
+                reply = 'mailboxes del name'
+        elif cmd == 'list':
+            reply = mailboxes
         else:
-            return 'mailboxes (add|del|list)'
+            reply = 'mailboxes [add|del|list] ...'
+
+        configuration['MAILBOXES'] = mailboxes
+        self.configure(configuration)
+
+        return reply
 
     def get_queued_messages(self, user):
         messages = []
