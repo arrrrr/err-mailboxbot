@@ -1,4 +1,3 @@
-import config
 from errbot import BotPlugin, botcmd
 from imaplib import IMAP4_SSL, IMAP4
 import logging
@@ -8,18 +7,35 @@ from smtplib import SMTP, SMTPException
 
 
 class MailboxBot(BotPlugin):
+    def get_configuration_template(self):
+        return {'MENTION_DELIM': ': ',
+                'SMTP_SERVER': 'server',
+                'SMTP_USERNAME': 'username',
+                'SMTP_PASSWORD': 'password',
+                'SMTP_FROM': 'addr',
+                'IMAP_SERVER': 'server',
+                'IMAP_USERNAME': 'username',
+                'IMAP_PASSWORD': 'password',
+                'IMAP_POLL_DELTA': 60,
+                'MAILBOXES': {}}
+
+    def check_configuration(self, configuration):
+        pass
+
     def __init__(self):
         super(MailboxBot, self).__init__()
         self.queue = {}
 
     def activate(self):
         super(MailboxBot, self).activate()
-        self.start_poller(config.IMAP_POLL_DELTA, self.imap_callback_message)
+        delta = self.config['IMAP_POLL_DELTA']
+        self.start_poller(delta, self.imap_callback_message)
 
     def callback_message(self, conn, mess):
+        delim = self.config['MENTION_DELIM']
         body = mess.getBody()
-        if config.MENTION_DELIM in body:
-            mention, text = body.split(config.MENTION_DELIM, 1)
+        if delim in body:
+            mention, text = body.split(delim, 1)
             room = mess.getMuckRoom()
 
             if room:
@@ -76,8 +92,9 @@ class MailboxBot(BotPlugin):
         return messages
 
     def relay_message(self, mailbox, sender, message):
-        if mailbox in config.MAILBOXES:
-            relay = config.MAILBOXES[mailbox]['relay']
+        mailboxes = self.config['MAILBOXES']
+        if mailbox in mailboxes:
+            relay = mailboxes[mailbox]['relay']
             if not relay:
                 self.queue_message(mailbox, sender, message)
             elif '/' in relay:
@@ -92,15 +109,17 @@ class MailboxBot(BotPlugin):
         self.send(jid, text)
 
     def smtp_message(self, to, sender, message):
+        username = self.config['SMTP_USERNAME']
+        password = self.config['SMTP_PASSWORD']
         text = '{}: {}'.format(sender, message)
 
         try:
-            with SMTP(config.SMTP_SERVER) as smtp:
+            with SMTP(self.config['SMTP_SERVER']) as smtp:
                 smtp.starttls()
-                smtp.login(config.SMTP_USERNAME, config.SMTP_PASSWORD)
+                smtp.login(username, password)
 
                 email = MIMEText('')
-                email['From'] = config.SMTP_FROM
+                email['From'] = self.config['SMTP_FROM']
                 email['To'] = to
                 email['Subject'] = text
 
@@ -119,9 +138,12 @@ class MailboxBot(BotPlugin):
         self.queue[user] = []
 
     def imap_callback_message(self):
+        username = self.config['IMAP_USERNAME']
+        password = self.config['IMAP_PASSWORD']
+
         try:
-            imap = IMAP4_SSL(config.IMAP_SERVER)
-            imap.login(config.IMAP_USERNAME, config.IMAP_PASSWORD)
+            imap = IMAP4_SSL(self.config['IMAP_SERVER'])
+            imap.login(username, password)
             imap.select()
 
             new = imap.search(None, 'UNSEEN')[1][0].decode('utf-8')
@@ -134,7 +156,7 @@ class MailboxBot(BotPlugin):
                     sender = email['From']
                     subject = email['Subject']
 
-                    if config.MENTION_DELIM in subject:
+                    if self.config['MENTION_DELIM'] in subject:
                         mention, text = subject.split(': ', 1)
                         self.relay_message(mention, sender, text)
 
