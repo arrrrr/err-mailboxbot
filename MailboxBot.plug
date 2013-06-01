@@ -1,0 +1,6 @@
+[Core]
+Name = MailboxBot
+Module = mailboxBot
+
+[Documentation]
+Description = Queue or relay messages for members not present in a MUC or an arbitrary mailbox name
