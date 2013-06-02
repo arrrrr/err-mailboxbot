@@ -44,7 +44,13 @@ class MailboxBot(BotPlugin):
                 sender = mess.getFrom()
 
             nicks = conn.get_members(room)
-            if not room or mention not in list(nicks):
+
+            if '@' in mention:
+                if '/' in mention:
+                    self.xmpp_message(mention, sender, text)
+                else:
+                    self.smtp_message(mention, sender, text)
+            elif not room or mention not in list(nicks):
                 self.relay_message(mention, sender, text)
 
     @botcmd
